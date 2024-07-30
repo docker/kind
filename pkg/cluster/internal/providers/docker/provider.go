@@ -100,6 +100,8 @@ func (p *provider) ListClusters() ([]string, error) {
 		"-a", // show stopped nodes
 		// filter for nodes with the cluster label
 		"--filter", "label="+clusterLabelKey,
+		// Explicitly request kube-system namespace so containers are not hidden by Docker Desktop API proxy
+		"--filter", "label=io.kubernetes.pod.namespace=kube-system",
 		// format to include the cluster name
 		"--format", fmt.Sprintf(`{{.Label "%s"}}`, clusterLabelKey),
 	)
@@ -117,6 +119,8 @@ func (p *provider) ListNodes(cluster string) ([]nodes.Node, error) {
 		"-a", // show stopped nodes
 		// filter for nodes with the cluster label
 		"--filter", fmt.Sprintf("label=%s=%s", clusterLabelKey, cluster),
+		// Explicitly request kube-system namespace so containers are not hidden by Docker Desktop API proxy
+		"--filter", "label=io.kubernetes.pod.namespace=kube-system",
 		// format to include the cluster name
 		"--format", `{{.Names}}`,
 	)
