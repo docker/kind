@@ -14,7 +14,7 @@ permissions:
 jobs:
   nerdctl:
     name: Nerdctl
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -26,11 +26,11 @@ jobs:
     env:
       JOB_NAME: "nerdctl-${{ matrix.deployment }}-${{ matrix.ipFamily }}"
       IP_FAMILY: ${{ matrix.ipFamily }}
-      NERDCTL_VERSION: "1.7.4"
+      NERDCTL_VERSION: "2.0.2"
       KIND_EXPERIMENTAL_PROVIDER: "nerdctl"
     steps:
       - name: Check out code into the Go module directory
-        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - uses: ./.github/actions/setup-env
 
@@ -91,14 +91,14 @@ jobs:
       - name: Export logs
         if: always()
         run: |
-          sudo cat /etc/cni/net.d/* 
+          sudo find /etc/cni/net.d/ -type f -exec sh -c 'echo "{}" && cat "{}"' \;
           sudo mkdir -p /tmp/kind/logs
           sudo /usr/local/bin/kind export logs /tmp/kind/logs
           sudo chown -R $USER:$USER /tmp/kind/logs
 
       - name: Upload logs
         if: always()
-        uses: actions/upload-artifact@0b2256b8c012f0828dc542b3febcab082c67f72b # v4.3.4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: kind-logs-${{ env.JOB_NAME }}-${{ github.run_id }}
           path: /tmp/kind/logs

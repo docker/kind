@@ -1,4 +1,18 @@
 #!/bin/sh
+# Copyright The Kubernetes Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 set -o errexit
 
 # 1. Create registry container unless it already exists
@@ -7,12 +21,14 @@ reg_port='5001'
 if [ "$(docker inspect -f '{{.State.Running}}' "${reg_name}" 2>/dev/null || true)" != 'true' ]; then
   docker run \
     -d --restart=always -p "127.0.0.1:${reg_port}:5000" --network bridge --name "${reg_name}" \
-    registry:2
+    registry:3
 fi
 
 # 2. Create kind cluster with containerd registry config dir enabled
-# TODO: kind will eventually enable this by default and this patch will
-# be unnecessary.
+#
+# NOTE: the containerd config patch is not necessary with images from kind v0.27.0+
+# It may enable some older images to work similarly.
+# If you're only supporting newer relases, you can just use `kind create cluster` here.
 #
 # See:
 # https://github.com/kubernetes-sigs/kind/issues/2875
