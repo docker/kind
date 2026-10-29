@@ -13,23 +13,34 @@ permissions:
 
 jobs:
   vm:
-    # Fedora is different from Ubuntu in LSM (SELinux), filesystem (btrfs), kernel version, etc.
-    name: "CGroupv2 (Fedora)"
-    runs-on: ubuntu-22.04
+    name: "VM"
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        provider: [docker, podman]
-        rootless: ["rootful", "rootless"]
+        include:
+          # Fedora is different from Ubuntu in LSM (SELinux), filesystem (btrfs), kernel version, etc.
+          - template: fedora
+            provider: docker
+            rootless: rootful
+          - template: fedora
+            provider: docker
+            rootless: rootless
+          - template: fedora
+            provider: podman
+            rootless: rootful
+          - template: fedora
+            provider: podman
+            rootless: rootless
     env:
       KIND_EXPERIMENTAL_PROVIDER: "${{ matrix.provider }}"
       ROOTLESS: "${{ matrix.rootless }}"
-      HELPER: "./hack/ci/vagrant-helper.sh"
-      JOB_NAME: "cgroup2-${{ matrix.provider }}-${{ matrix.rootless }}"
+      HELPER: "./hack/ci/lima-helper.sh"
+      JOB_NAME: "vm-${{ matrix.template }}-${{ matrix.provider }}-${{ matrix.rootless }}"
     steps:
       - name: Check out code
-        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Get go version
         id: golangversion
@@ -38,32 +49,39 @@ jobs:
 
       - name: Set up Go
         id: go
-        uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: ${{ steps.golangversion.outputs.go_version }}
           check-latest: true
 
-      # https://github.com/containerd/containerd/blob/420503072e58f27a7192ddea4e6e41dced911cb9/.github/workflows/ci.yml#L569-L581
-      - name: Set up vagrant
+      - name: "Install Lima"
+        uses: lima-vm/lima-actions/setup@55627e31b78637bf254a8b2a14da8ea7d12564e5 # v1
+        id: lima-actions-setup
+
+      - name: "Cache ~/.cache/lima"
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/lima
+          key: lima-${{ steps.lima-actions-setup.outputs.version }}-${{ matrix.template }}
+
+      - name: "Start VM"
+        # --plain is set to disable file sharing, port forwarding, built-in containerd, etc.
+        run: limactl start --name=default --plain template://${{ matrix.template }}
+
+      - name: "Initialize VM"
         run: |
-          # Canonical's Vagrant 2.2.19 dpkg cannot download Fedora 38 image: https://bugs.launchpad.net/vagrant/+bug/2017828
-          # So we have to install Vagrant >= 2.3.1 from the upstream: https://github.com/opencontainers/runc/blob/v1.1.8/.cirrus.yml#L41-L49
-          curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
-          echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
-          sudo apt-get update
-          sudo apt-get install -y vagrant virtualbox
-      - name: Boot Fedora
-        run: |
-          ln -sf ./hack/ci/Vagrantfile ./Vagrantfile
-          # Retry if it fails (download.fedoraproject.org returns 404 sometimes)
-          # Spend up to 10 seconds on this
-          for i in {1..4}; do
-            if vagrant up; then
-              break
-            fi
-            vagrant destroy -f
-            sleep $i
-          done
+          set -eux -o pipefail
+          # Sync the current directory to /tmp/kind in the guest
+          limactl cp -r . default:/tmp/kind
+          # Install packages
+          lima sudo /tmp/kind/hack/ci/init-vm.sh
+          # Enable systemd lingering for rootless. $USER on the host may differ
+          # from the Lima guest user (e.g. runner vs runner.guest), so derive
+          # the username inside the VM.
+          lima bash -c 'sudo loginctl enable-linger "$(id -un)"'
+          # Install kind
+          lima sudo git config --global --add safe.directory /tmp/kind
+          lima sudo make -C /tmp/kind install INSTALL_DIR=/usr/bin
 
       - name: Set up Rootless Docker
         if: ${{ matrix.provider == 'docker' && matrix.rootless == 'rootless' }}
@@ -74,15 +92,6 @@ jobs:
           "$HELPER" dockerd-rootless-setuptool.sh install
           # Modify the client config to use the rootless daemon by default
           "$HELPER" docker context use rootless
-
-      - name: Set up Rootless Podman
-        if: ${{ matrix.provider == 'podman' && matrix.rootless == 'rootless' }}
-        run: |
-          # Restart the user session to ensure the cgroup delegation
-          # ref: https://github.com/kubernetes-sigs/kind/pull/2754#issuecomment-1124027063
-          "$HELPER" sudo loginctl terminate-user vagrant || true
-          # We have modprobe ip6_tables in Vagrantfile, but it seems we have to modprobe it once again
-          "$HELPER" sudo modprobe ip6_tables
 
       - name: Show provider info
         run: |
@@ -102,13 +111,16 @@ jobs:
       - name: Export logs
         if: always()
         run: |
-          "$HELPER" kind export logs /tmp/kind/logs
-          mkdir -p /tmp/kind/logs
+          "$HELPER" mkdir -p /tmp/kind/logs
+          "$HELPER" kind export logs /tmp/kind/logs || true
+          "$HELPER" sh -c 'journalctl --no-pager --user --unit docker.service -n 50 > /tmp/kind/logs/docker-user-service.log 2>&1 || true'
+          mkdir -p /tmp/kind/logs/lima
+          cp -a ~/.lima/default/*.log /tmp/kind/logs/lima || true
           "$HELPER" tar cC /tmp/kind/logs . | tar xC /tmp/kind/logs
 
       - name: Upload logs
         if: always()
-        uses: actions/upload-artifact@0b2256b8c012f0828dc542b3febcab082c67f72b # v4.3.4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: kind-logs-${{ env.JOB_NAME }}-${{ github.run_id }}
           path: /tmp/kind/logs

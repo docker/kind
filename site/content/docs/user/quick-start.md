@@ -84,7 +84,7 @@ use it as `kind` from the command line.
 
 #### Installing with `go install`
 
-When installing with [Go](https://golang.org/) please use the latest stable Go release. At least go1.16 or greater is required.
+When installing with [Go](https://golang.org/) please use the latest stable Go release.
 
 To install use: `go install sigs.k8s.io/kind@{{< stableVersion >}}`.
 
@@ -131,6 +131,22 @@ On Windows via Winget (https://github.com/microsoft/winget-pkgs/tree/master/mani
 winget install Kubernetes.kind
 {{< /codeFromInline >}}
 
+On Arch Linux via pacman (https://archlinux.org/packages/extra/x86_64/kind/)
+{{< codeFromInline lang="bash" >}}
+sudo pacman -Syu kind
+{{< /codeFromInline >}}
+
+## Discovering Additional Command Options
+
+kind provides built-in help for all commands and subcommands.  
+You can explore available flags and usage details by running:
+
+kind help
+kind <command> --help
+kind <command> <subcommand> --help
+
+This applies to commands such as `kind load image-archive`
+
 ## Creating a Cluster
 
 Creating a Kubernetes cluster is as simple as `kind create cluster`.
@@ -157,8 +173,11 @@ wait for 30 seconds, do `--wait 30s`, for 5 minutes do `--wait 5m`, etc.
 
 More usage can be discovered with `kind create cluster --help`.
 
-The kind can auto-detect the [docker], [podman], or [nerdctl] installed and choose the available one. If you want to turn off the auto-detect, use the environment variable `KIND_EXPERIMENTAL_PROVIDER=docker`, `KIND_EXPERIMENTAL_PROVIDER=podman` or `KIND_EXPERIMENTAL_PROVIDER=nerdctl` to
+kind can auto-detect the [docker], [podman], or [nerdctl] installed and choose the available one. If you want to turn off the auto-detect, use the environment variable `KIND_EXPERIMENTAL_PROVIDER=docker`, `KIND_EXPERIMENTAL_PROVIDER=podman` or `KIND_EXPERIMENTAL_PROVIDER=nerdctl` to
 select the runtime.
+
+> **NOTE**: podman and nerdctl operate in [rootless mode](/docs/user/rootless) by default. Extra
+> setup is needed for KIND clusters to be fully functional.
 
 ## Interacting With Your Cluster
 
@@ -218,22 +237,31 @@ context name `kind` and delete that cluster.
 
 ## Loading an Image Into Your Cluster
 
-Docker images can be loaded into your cluster nodes with:
+You can load one or more images into your kind cluster:
 
-`kind load docker-image my-custom-image-0 my-custom-image-1`
+```bash
+kind load docker-image my-app:latest
+```
 
-> **Note**: If using a named cluster you will need to specify the name of the
-> cluster you wish to load the images into:
-> `kind load docker-image my-custom-image-0 my-custom-image-1 --name kind-2`
+```bash
+kind load docker-image my-app:latest my-db:latest my-cache:latest
+```
+
+Note: If using a named cluster you will need to specify the name of the cluster:
+
+```bash
+kind load docker-image my-app:latest --name test-cluster
+```
 
 Additionally, image archives can be loaded with:
 `kind load image-archive /my-image-archive.tar`
 
 This allows a workflow like:
+
 ```
 docker build -t my-custom-image:unique-tag ./my-image-dir
 kind load docker-image my-custom-image:unique-tag
-kubectl apply -f my-manifest-using-my-image:unique-tag
+kubectl apply -f my-manifest-using-my-image.yaml
 ```
 
 > **NOTE**: You can get a list of images present on a cluster node by
@@ -314,12 +342,13 @@ dedicated to the virtual machine (VM) running the Docker engine. 8GB is recommen
 
 To change the resource limits for the Docker on Mac, you'll need to open the
 **Preferences** menu.
+
 <img src="/docs/user/images/docker-pref-1.png"/>
 
 Now, go to the **Advanced** settings page, and change the
 settings there, see [changing Docker's resource limits][Docker resource lims].
-<img src="/docs/user/images/docker-pref-2.png" alt="Setting 8Gb of memory in Docker for Mac" />
 
+<img src="/docs/user/images/docker-pref-build.png" alt="Setting 8Gb of memory in Docker for Mac" />
 
 To change the resource limits for the Docker on Windows, you'll need to right-click the Moby
 icon on the taskbar, and choose "Settings". If you see "Switch to Linux Containers", then you'll need

@@ -1,4 +1,5 @@
-# Copyright 2019 The Kubernetes Authors.
+#!/usr/bin/env bash
+# Copyright The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,16 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# minimal config file to avoid haproxy exiting due to invalid / missing config
-# kind will rewrite this config at runtime
-global
-    # limit memory usage to approximately 18 MB
-    maxconn 100000
+set -o errexit -o nounset -o pipefail
 
-frontend controlPlane
-    bind 0.0.0.0:6443
-    mode tcp
-    default_backend kube-apiservers
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." &> /dev/null && pwd -P)"
+cd "${REPO_ROOT}"
 
-backend kube-apiservers
-    mode tcp
+hack/boilerplate/verify_boilerplate.py --rootdir "${REPO_ROOT}" --boilerplate-dir "${REPO_ROOT}/hack/boilerplate"
