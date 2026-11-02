@@ -6,7 +6,7 @@ title: kind
 [kind] is a tool for running local Kubernetes clusters using Docker container "nodes".  
 kind was primarily designed for testing Kubernetes itself, but may be used for local development or CI.
 
-If you have [go] 1.16+ and [docker], [podman] or [nerdctl] installed `go install sigs.k8s.io/kind@{{< stableVersion >}} && kind create cluster` is all you need!
+If you have [go] 1.17+ and [docker], [podman] or [nerdctl] installed `go install sigs.k8s.io/kind@{{< stableVersion >}} && kind create cluster` is all you need!
 
 <img src="images/kind-create-cluster.png" />
 
@@ -83,7 +83,7 @@ See also: our own [contributor guide] and the Kubernetes [community page].
 - kind supports building Kubernetes release builds from source
   - support for make / bash or docker, in addition to pre-published builds
 - kind supports Linux, macOS and Windows
-- kind is a [CNCF certified conformant Kubernetes installer](https://landscape.cncf.io/?selected=kind)
+- kind is a [CNCF certified conformant Kubernetes installer](https://landscape.cncf.io/?group=projects-and-products&item=platform--certified-kubernetes-installer--kind)
 
 ### Code of conduct
 

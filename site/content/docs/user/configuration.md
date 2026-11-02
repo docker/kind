@@ -86,13 +86,14 @@ featureGates:
 
 Kubernetes API server runtime-config can be toggled using the `runtimeConfig`
 key, which maps to the `--runtime-config` [kube-apiserver flag](https://kubernetes.io/docs/reference/command-line-tools-reference/kube-apiserver/).
-This may be used to e.g. disable beta / alpha APIs.
+This may be used to e.g. disable beta / alpha APIs, or even enable deprecated APIs.
 
 {{< codeFromInline lang="yaml" >}}
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 runtimeConfig:
   "api/alpha": "false"
+  "apps/v1beta2": "true"
 {{< /codeFromInline >}}
 
 ### Networking
@@ -102,7 +103,7 @@ Multiple details of the cluster's networking can be customized under the
 
 #### IP Family
 
-KIND has support for IPv4, IPv6 and dual-stack clusters, you can switch from the default of IPv4 by setting:
+KIND has support for IPv4, IPv6 and dual-stack clusters, with the default being `ipv4`. You can change this by setting `ipFamily` under `networking` to `ipv6` or `dual`, see below for more requirements.
 
 ##### IPv6 clusters
 You can run IPv6 single-stack clusters using `kind`, if the host that runs the docker containers support IPv6.
@@ -261,6 +262,9 @@ nodes:
 - role: worker
 {{< /codeFromInline >}}
 
+Multiple `control-plane` nodes may be specified in order to test a "high availability"
+control plane.
+
 ## Per-Node Options
 
 The following options are available for setting on each entry in `nodes`.
@@ -307,6 +311,9 @@ If you are running Docker without the Docker Desktop Application on Linux, you c
 With the installation of the Docker Desktop Application, whether it is on macOs, Windows or Linux, you'll want to use these.
 
 You may also want to see the [Ingress Guide].
+
+> **NOTE**: If you're running Kind on a remote host and need to send traffic to Kind node
+> IPs from a different host than where kind is running, you need to configure port-mapping.
 
 {{< codeFromFile file="static/examples/config-with-port-mapping.yaml" lang="yaml" >}}
 
@@ -434,6 +441,26 @@ nodes:
     apiServer:
         extraArgs:
           enable-admission-plugins: NodeRestriction,MutatingAdmissionWebhook,ValidatingAdmissionWebhook
+{{< /codeFromInline >}}
+
+> **NOTE**: When using `KubeletConfiguration`, kubeadm only reads the kubelet configuration from the **first** node, which will apply to all nodes.
+> This is a current [limitation](https://github.com/kubernetes-sigs/kind/issues/3849).
+
+As a result, if you want to change the kubelet's configuration for any additional node, such as applying a taint, you must use `JoinConfiguration`:
+
+{{< codeFromInline lang="yaml" >}}
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: test
+nodes:
+- role: control-plane
+- role: worker
+  kubeadmConfigPatches:
+    - |
+      kind: JoinConfiguration
+      nodeRegistration:
+        kubeletExtraArgs:
+          register-with-taints: "my-taint=presence:NoSchedule"
 {{< /codeFromInline >}}
 
 On every additional node configured in the KIND cluster, 

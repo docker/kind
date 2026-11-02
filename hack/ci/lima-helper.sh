@@ -15,14 +15,8 @@
 
 set -o errexit -o nounset -o pipefail
 
-
 : "${KIND_EXPERIMENTAL_PROVIDER:=docker}"
-SSH_CONFIG=".vagrant/ssh-config"
-if [ ! -f "$SSH_CONFIG" ]; then
-  vagrant ssh-config > "$SSH_CONFIG"
-fi
 
-if [ "$ROOTLESS" = "rootless" ]; then
-  exec ssh -F "$SSH_CONFIG" default KIND_EXPERIMENTAL_PROVIDER="$KIND_EXPERIMENTAL_PROVIDER" "${@}"
-fi
-exec ssh -F "$SSH_CONFIG" default sudo KIND_EXPERIMENTAL_PROVIDER="$KIND_EXPERIMENTAL_PROVIDER" "${@}"
+sudo=sudo
+[ "$ROOTLESS" = "rootless" ] && sudo=
+exec lima $sudo KIND_EXPERIMENTAL_PROVIDER="$KIND_EXPERIMENTAL_PROVIDER" "${@}"

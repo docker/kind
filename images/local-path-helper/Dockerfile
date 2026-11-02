@@ -15,7 +15,7 @@
 # This image is contains the binaries needed for the local-path-provisioner
 # helper pod. Currently that means: sh, rm, mkdir
 
-ARG BASE="registry.k8s.io/build-image/debian-base:bullseye-v1.4.3"
+ARG BASE="debian:trixie-slim"
 FROM ${BASE} AS build
 
 # NOTE: copyrights.tar.gz is a quirk of Kubernetes's debian-base image
@@ -26,7 +26,7 @@ RUN [ ! -f /usr/share/copyrights.tar.gz ] || tar -C / -xzvf /usr/share/copyright
 # we need bash for stage-binary-and-deps.sh
 RUN apt update && apt install -y --no-install-recommends bash
 # replace sh with bash
-RUN ln -sf /bin/bash /bin/sh
+RUN ln -sf /usr/bin/bash /usr/bin/sh
 
 # copy in script for staging distro provided binary to distroless
 COPY --chmod=0755 stage-binary-and-deps.sh /usr/local/bin/
@@ -42,6 +42,6 @@ RUN mkdir -p "${STAGE_DIR}" && \
     find "${STAGE_DIR}"
 
 # copy staged binary + deps + copyright into distroless
-FROM "gcr.io/distroless/static-debian11"
+FROM "gcr.io/distroless/static-debian13"
 ARG STAGE_DIR="/opt/stage"
 COPY --from=build "${STAGE_DIR}/" /

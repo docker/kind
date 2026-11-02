@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package nodeimage implements the nodeimage CLI subcommand.
 package nodeimage
 
 import (
@@ -30,7 +31,6 @@ type flagpole struct {
 	BuildType string
 	Image     string
 	BaseImage string
-	KubeRoot  string
 	Arch      string
 }
 
@@ -38,18 +38,19 @@ type flagpole struct {
 func NewCommand(logger log.Logger, streams cmd.IOStreams) *cobra.Command {
 	flags := &flagpole{}
 	cmd := &cobra.Command{
-		Args: cobra.MaximumNArgs(1),
-		// TODO(bentheelder): more detailed usage
+		Args:  cobra.MaximumNArgs(1),
 		Use:   "node-image [kubernetes-source]",
 		Short: "Build the node image",
-		Long:  "Build the node image which contains Kubernetes build artifacts and other kind requirements",
+		Long: `Build the node image which contains Kubernetes build artifacts and other kind requirements.
+By default, this will build from a local Kubernetes source directory (auto-detected if omitted).
+
+You can also build from:
+- A local Kubernetes source directory path (e.g., /path/to/kubernetes/source)
+- A local Kubernetes release tarball path (e.g., /path/to/kubernetes-server-linux-amd64.tar.gz)
+- A URL to a Kubernetes release tarball (e.g., https://dl.k8s.io/v1.30.0/kubernetes-server-linux-amd64.tar.gz)
+- A release version (e.g., v1.36.1)
+- A Kubernetes CI build version marker prefixed with 'ci/' (e.g., ci/latest, ci/latest-1.36)`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if cmd.Flags().Lookup("kube-root").Changed {
-				if len(args) != 0 {
-					return errors.New("passing an argument and deprecated --kube-root is not supported, please switch to just the argument")
-				}
-				logger.Warn("--kube-root is deprecated, please switch to passing this as an argument")
-			}
 			return runE(logger, flags, args)
 		},
 	}
@@ -57,19 +58,13 @@ func NewCommand(logger log.Logger, streams cmd.IOStreams) *cobra.Command {
 		&flags.BuildType,
 		"type",
 		"",
-		"optionally specify one of 'url', 'file', 'release' or 'source' as the type of build",
+		"optionally specify one of 'url', 'file', 'release', 'ci' or 'source' as the type of build",
 	)
 	cmd.Flags().StringVar(
 		&flags.Image,
 		"image",
 		nodeimage.DefaultImage,
 		"name:tag of the resulting image to be built",
-	)
-	cmd.Flags().StringVar(
-		&flags.KubeRoot,
-		"kube-root",
-		"",
-		"DEPRECATED: please switch to just the argument. Path to the Kubernetes source directory (if empty, the path is autodetected)",
 	)
 	cmd.Flags().StringVar(
 		&flags.BaseImage,
@@ -87,14 +82,14 @@ func NewCommand(logger log.Logger, streams cmd.IOStreams) *cobra.Command {
 }
 
 func runE(logger log.Logger, flags *flagpole, args []string) error {
-	kubeRoot := flags.KubeRoot
+	sourceSpec := ""
 	if len(args) > 0 {
-		kubeRoot = args[0]
+		sourceSpec = args[0]
 	}
 	if err := nodeimage.Build(
 		nodeimage.WithImage(flags.Image),
 		nodeimage.WithBaseImage(flags.BaseImage),
-		nodeimage.WithKubeParam(kubeRoot),
+		nodeimage.WithKubeParam(sourceSpec),
 		nodeimage.WithLogger(logger),
 		nodeimage.WithArch(flags.Arch),
 		nodeimage.WithBuildType(flags.BuildType),

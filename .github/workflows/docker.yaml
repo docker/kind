@@ -14,19 +14,19 @@ permissions:
 jobs:
   docker:
     name: Docker
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
         ipFamily: [ipv4, ipv6]
-        deployment: [singleNode, multiNode]
+        deployment: [singleNode, multiNode, multiMaster]
     env:
       JOB_NAME: "docker-${{ matrix.deployment }}-${{ matrix.ipFamily }}"
       IP_FAMILY: ${{ matrix.ipFamily }}
     steps:
       - name: Check out code into the Go module directory
-        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - uses: ./.github/actions/setup-env
 
@@ -54,6 +54,20 @@ jobs:
           - role: worker
           EOF
 
+      - name: Create multi master cluster
+        if: ${{ matrix.deployment == 'multiMaster' }}
+        run: |
+          cat <<EOF | /usr/local/bin/kind create cluster -v7 --wait 1m --retain --config=-
+          kind: Cluster
+          apiVersion: kind.x-k8s.io/v1alpha4
+          networking:
+            ipFamily: ${IP_FAMILY}
+          nodes:
+          - role: control-plane
+          - role: control-plane
+          - role: worker
+          EOF
+
       - name: Get Cluster status
         run: |
           # wait network is ready
@@ -75,7 +89,7 @@ jobs:
 
       - name: Upload logs
         if: always()
-        uses: actions/upload-artifact@0b2256b8c012f0828dc542b3febcab082c67f72b # v4.3.4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: kind-logs-${{ env.JOB_NAME }}-${{ github.run_id }}
           path: /tmp/kind/logs
